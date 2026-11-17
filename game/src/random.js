@@ -1,33 +1,31 @@
-// Seeded randomness for VELDORA BAY: mulberry32 plus the small helpers the
-// city builder and the shot stager use, so a seed always rebuilds the same city.
-
-/** A mulberry32 generator: fast, deterministic, good enough for placement. */
-export function createRandom(seed) {
-  let state = (seed >>> 0) || 0x9e3779b9;
-  function next() {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  }
-  return {
-    next,
-    /** Float in [min, max). */
-    range(min, max) {
-      return min + next() * (max - min);
-    },
-    /** Integer in [min, max]. */
-    int(min, max) {
-      return min + Math.floor(next() * (max - min + 1));
-    },
-    /** One element of an array. */
-    pick(items) {
-      return items[Math.floor(next() * items.length)];
-    },
-    /** True with the given probability. */
-    chance(p) {
-      return next() < p;
-    },
+// Seeded random numbers (mulberry32) so the city, traffic and every
+// screenshot staged with ?seed=1 are identical on every run.
+export function makeRng(seed) {
+  let a = seed >>> 0;
+  return function next() {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+export function range(rng, min, max) {
+  return min + rng() * (max - min);
+}
+
+export function pick(rng, list) {
+  return list[Math.floor(rng() * list.length) % list.length];
+}
+
+export function shuffle(rng, list) {
+  const out = list.slice();
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = out[i];
+    out[i] = out[j];
+    out[j] = tmp;
+  }
+  return out;
 }

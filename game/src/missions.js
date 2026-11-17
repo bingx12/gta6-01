@@ -1,275 +1,207 @@
-// Story missions for VELDORA BAY. Rae Calloway, ex-getaway driver, is back in
-// the city and owes the fixer Marla Voss one last job. Five missions, each a
-// list of steps the controller walks through: reach a place, get in a car,
-// survive the heat, clear the docks, or steal the van. The controller owns
-// the state; main.js owns the world effects (spawning enemies, setting
-// wanted, paying out) through the hooks each step fires.
+// Missions and story: five jobs for Rae Calloway, who owes the fixer
+// Marla Voss one last job in Veldora Bay. Each mission stages its
+// characters and vehicles before the action starts, so the chase cop is
+// already visible when the chase begins and the dock guards are already
+// standing on the pier when the shooting starts.
+import * as THREE from 'three';
 
-import { MISSIONS } from './config.js';
-
-const TITLES = [
-  "Back in the Driver's Seat",
-  'The Getaway',
-  'Parcel Run',
-  'Dockside Heat',
-  'The Veldora Job',
+export const MISSIONS = [
+  {
+    id: 1, name: 'First Gear', reward: 400,
+    briefing: 'MARLA VOSS: "Rae. You are back. One last job and we are square. First, prove you can still drive. Take the car and reach the Coral Plaza marker."',
+    objective: 'Drive to the Coral Plaza marker',
+    target: new THREE.Vector3(58, 0, 58),
+    start: { x: 0, z: 0 },
+    needsCar: true,
+  },
+  {
+    id: 2, name: 'Hot Pursuit', reward: 800,
+    briefing: 'MARLA VOSS: "The package is in the car. The cops already know. Lose them — or outrun them — and get to the marina."',
+    objective: 'Outrun the police and reach the marina',
+    target: new THREE.Vector3(-116, 0, 116),
+    start: { x: 0, z: -58 },
+    needsCar: true, wanted: 2,
+  },
+  {
+    id: 3, name: 'Parcel Run', reward: 1200,
+    briefing: 'MARLA VOSS: "A parcel for the old harbour master. Ninety seconds, no excuses. The clock is already running, Rae."',
+    objective: 'Deliver the parcel to the harbour office in 90 seconds',
+    target: new THREE.Vector3(-116, 0, -116),
+    start: { x: 116, z: 116 },
+    needsCar: true, timed: 90,
+  },
+  {
+    id: 4, name: 'Dockside', reward: 2000,
+    briefing: 'MARLA VOSS: "The manifest is in the dock office. The guards will not hand it over. Go in loud, get it, get out."',
+    objective: 'Clear the dock guards, then reach the dock office',
+    target: new THREE.Vector3(-40, 0, -126),
+    start: { x: -40, z: -108 },
+    shootout: true,
+  },
+  {
+    id: 5, name: 'The Last Job', reward: 5000,
+    briefing: 'MARLA VOSS: "The armoured van leaves the bank at sunset. Take it, bring it to the old warehouse, and your debt is gone. One last job, Rae."',
+    objective: 'Steal the armoured van and deliver it to the warehouse',
+    target: new THREE.Vector3(116, 0, -116),
+    start: { x: -58, z: 58 },
+    needsCar: true, van: true,
+  },
 ];
 
-const BRIEFS = [
-  "Marla Voss: \"Rae. You're back. The city's changed, the driving hasn't. Steal a car and meet me at the plaza. Don't make it complicated.\"",
-  "Dizzy's waiting at the docks with a duffel of Marla's money and the cops already sniffing. Pick him up, lose the tail, and bring him to the safehouse.",
-  "Three parcels, three drops, one clock. The clients pay for discretion and speed — mostly speed. 150 seconds, no excuses.",
-  "Marla's shipment is pinned down at the docks by Voss's rivals. Clear the guards, grab the crate, and get out breathing.",
-  "The last job. An armored van full of casino cash is parked at Bay 12. Take it, outrun everything the city throws at you, and bring it to the beach.",
-];
-
-const DEBRIEFS = [
-  '"Not bad, Rae. You still drive like the city owes you money."',
-  '"Dizzy\'s safe. Marla says you\'re earning your way back."',
-  '"All three drops, on time. The clients are asking for you by name."',
-  '"The crate\'s ours. You just made a lot of enemies, Rae — and one friend."',
-  '"It\'s done. The debt is paid, the city is yours again. Welcome home, Rae."',
-];
-
-/**
- * Build the five missions from the city landmarks. `api` is what the steps
- * call into the world: spawnEnemy, spawnVan, setWanted, clearWanted, toast.
- */
-export function buildMissions(landmarks, api) {
-  const L = landmarks;
-  const missions = [
-    {
-      id: 0,
-      title: TITLES[0],
-      brief: BRIEFS[0],
-      debrief: DEBRIEFS[0],
-      reward: MISSIONS.REWARDS[0],
-      steps: [
-        { kind: 'drive', text: 'Steal a car — walk up to one and press E', target: null, radius: 0 },
-        { kind: 'reach', text: 'Drive to the plaza meet', target: L.plaza, radius: 10 },
-      ],
-    },
-    {
-      id: 1,
-      title: TITLES[1],
-      brief: BRIEFS[1],
-      debrief: DEBRIEFS[1],
-      reward: MISSIONS.REWARDS[1],
-      steps: [
-        { kind: 'reach', text: 'Pick up Dizzy at the docks', target: L.docks, radius: 10 },
-        {
-          kind: 'reach',
-          text: 'Lose the cops — reach the safehouse',
-          target: L.safehouse,
-          radius: 10,
-          onEnter() {
-            api.setWanted(2);
-            api.toast('WANTED: 2 stars — the VBPD is on you');
-          },
-          onLeave() {
-            api.clearWanted();
-          },
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: TITLES[2],
-      brief: BRIEFS[2],
-      debrief: DEBRIEFS[2],
-      reward: MISSIONS.REWARDS[2],
-      timeLimit: 150,
-      steps: [
-        { kind: 'reach', text: 'Drop 1 of 3 — the beach kiosk', target: L.beach, radius: 9 },
-        { kind: 'reach', text: 'Drop 2 of 3 — the hospital', target: L.hospital, radius: 9 },
-        { kind: 'reach', text: 'Drop 3 of 3 — the warehouse', target: L.warehouse, radius: 9 },
-      ],
-    },
-    {
-      id: 3,
-      title: TITLES[3],
-      brief: BRIEFS[3],
-      debrief: DEBRIEFS[3],
-      reward: MISSIONS.REWARDS[3],
-      steps: [
-        { kind: 'reach', text: 'Get to the docks', target: L.docks, radius: 14 },
-        {
-          kind: 'kill',
-          text: 'Clear the dock guards (4)',
-          target: L.docks,
-          radius: 16,
-          count: 4,
-          onEnter() {
-            api.spawnDockGuards();
-            api.toast('Four guards between you and the crate');
-          },
-        },
-        { kind: 'reach', text: 'Grab the crate at the pier', target: { x: -175, z: 252 }, radius: 6 },
-      ],
-    },
-    {
-      id: 4,
-      title: TITLES[4],
-      brief: BRIEFS[4],
-      debrief: DEBRIEFS[4],
-      reward: MISSIONS.REWARDS[4],
-      steps: [
-        { kind: 'reach', text: 'Get to Bay 12 Warehouse', target: L.warehouse, radius: 12 },
-        {
-          kind: 'van',
-          text: 'Steal the armored van (press E)',
-          target: L.warehouse,
-          radius: 12,
-          onEnter() {
-            api.spawnVan();
-          },
-        },
-        {
-          kind: 'reach',
-          text: 'Escape to the beach with the van',
-          target: L.beach,
-          radius: 12,
-          onEnter() {
-            api.setWanted(4);
-            api.toast('WANTED: 4 stars — every unit in the city is coming');
-          },
-        },
-      ],
-    },
-  ];
-
-  return {
-    missions,
-    /** The next mission the player has not finished, or null. */
-    nextMission(completed) {
-      return missions.find((m) => !completed.has(m.id)) || null;
-    },
-  };
-}
-
-/** The live mission controller: starts missions, walks their steps, pays out. */
-export function createMissionController(missionData, hooks) {
-  const completed = new Set();
-  let active = null;
-  let stepIndex = 0;
-  let timer = 0;
-  let kills = 0;
-  let failed = null;
-
-  function currentStep() {
-    return active ? active.steps[stepIndex] : null;
+export class MissionManager {
+  constructor(game) {
+    this.game = game;
+    this.index = 0;
+    this.active = null;
+    this.timer = 0;
+    this.marker = null;
+    this.van = null;
+    this.stagedCop = null;
   }
 
-  function enterStep() {
-    const step = currentStep();
-    if (step && step.onEnter) step.onEnter();
-    if (step) hooks.onObjective(step.text);
+  get current() {
+    return MISSIONS[this.index] || null;
   }
 
-  function advance() {
-    const step = currentStep();
-    if (step && step.onLeave) step.onLeave();
-    stepIndex += 1;
-    kills = 0;
-    if (stepIndex >= active.steps.length) {
-      const reward = active.reward;
-      hooks.onCash(reward);
-      hooks.onDialogue(active.debrief);
-      hooks.onMissionComplete(active);
-      completed.add(active.id);
-      active = null;
-      stepIndex = 0;
+  get done() {
+    return this.index >= MISSIONS.length;
+  }
+
+  makeMarker(pos) {
+    const geo = new THREE.CylinderGeometry(3.2, 3.2, 0.25, 24);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffd23e, transparent: true, opacity: 0.75 });
+    const marker = new THREE.Mesh(geo, mat);
+    marker.position.set(pos.x, 0.15, pos.z);
+    this.game.scene.add(marker);
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.1, 1.1, 26, 12, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xffd23e, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false,
+      }),
+    );
+    beam.position.set(pos.x, 13, pos.z);
+    this.game.scene.add(beam);
+    marker.userData.beam = beam;
+    return marker;
+  }
+
+  clearMarker() {
+    if (!this.marker) return;
+    this.game.scene.remove(this.marker);
+    if (this.marker.userData.beam) this.game.scene.remove(this.marker.userData.beam);
+    this.marker = null;
+  }
+
+  start(index = this.index) {
+    const def = MISSIONS[index];
+    if (!def) return false;
+    this.active = def;
+    this.timer = def.timed || 0;
+    const g = this.game;
+    // Stage the player at the mission start, on foot, before anything moves.
+    g.player.teleport(def.start.x, def.start.z);
+    g.exitCar();
+    g.combat.clearEnemies();
+    g.police.clearHeat();
+    if (this.stagedCop) {
+      g.scene.remove(this.stagedCop.mesh);
+      this.stagedCop = null;
+    }
+    if (this.van) {
+      g.scene.remove(this.van.mesh);
+      this.van = null;
+    }
+    if (def.needsCar) {
+      // A getaway car is parked at the player's feet when the job starts.
+      const car = g.spawnMissionCar(def.start.x + 4, def.start.z + 2, 0);
+      g.hud.say('A car is waiting. Press E to steal it.');
+    }
+    if (def.wanted) {
+      // The chase cop is staged in the scene BEFORE the chase begins.
+      this.stagedCop = g.police.spawnPoliceCar(new THREE.Vector3(def.start.x, 0, def.start.z));
+      g.police.addHeat(def.wanted);
+    }
+    if (def.shootout) {
+      // Guards are standing on the pier before the player arrives.
+      const dock = g.city.dockPos;
+      const spots = [
+        [dock.x - 18, dock.z + 2], [dock.x - 6, dock.z - 4],
+        [dock.x + 8, dock.z + 4], [dock.x + 18, dock.z - 2],
+        [dock.x, dock.z - 10],
+      ];
+      for (const [x, z] of spots) g.combat.spawnEnemy(x, z);
+      g.hud.say('Five guards hold the docks. Clear them out.');
+    }
+    if (def.van) {
+      this.van = g.spawnMissionCar(-30, 30, Math.PI / 2, 0x3a3a42);
+      this.van.mesh.scale.set(1.15, 1.1, 1.25);
+      g.hud.say('The armoured van is by the bank. Take it.');
+    }
+    this.clearMarker();
+    this.marker = this.makeMarker(def.target);
+    g.hud.say(def.briefing);
+    g.hud.setObjective(def.objective);
+    g.audio.pickup();
+    return true;
+  }
+
+  update(dt) {
+    if (!this.active) return;
+    const g = this.game;
+    if (this.marker) {
+      this.marker.rotation.y += dt * 1.2;
+      this.marker.position.y = 0.15 + Math.sin(performance.now() / 300) * 0.08;
+    }
+    if (this.active.timed) {
+      this.timer -= dt;
+      if (this.timer <= 0) {
+        this.fail('Out of time — the parcel run failed.');
+        return;
+      }
+    }
+    if (this.active.shootout && g.combat.aliveCount() > 0) return;
+    const pos = g.playerCar ? g.playerCar.pos : g.player.pos;
+    const dist = pos.distanceTo(this.active.target);
+    if (this.active.van && g.playerCar !== this.van) {
+      // The van itself must be the delivery vehicle.
+      if (dist < 6 && g.playerCar) {
+        g.hud.say('Wrong car — bring the armoured van, not this one.');
+      }
       return;
     }
-    enterStep();
+    if (dist < 6) this.complete();
   }
 
-  return {
-    get active() {
-      return active;
-    },
-    get completed() {
-      return completed;
-    },
-    get failed() {
-      return failed;
-    },
-    get timeLeft() {
-      return active && active.timeLimit ? Math.max(0, active.timeLimit - timer) : null;
-    },
-    get currentObjective() {
-      const step = currentStep();
-      return step ? step.text : null;
-    },
-    get marker() {
-      const step = currentStep();
-      return step && step.target ? step.target : null;
-    },
-    get missionList() {
-      return missionData.missions.map((m) => ({
-        id: m.id,
-        title: m.title,
-        reward: m.reward,
-        state: completed.has(m.id) ? 'done' : active === m ? 'active' : 'available',
-      }));
-    },
-    startNext() {
-      if (active) return false;
-      const next = missionData.nextMission(completed);
-      if (!next) return false;
-      active = next;
-      stepIndex = 0;
-      timer = 0;
-      kills = 0;
-      failed = null;
-      hooks.onDialogue(next.brief);
-      hooks.onMissionStart(next);
-      enterStep();
-      return true;
-    },
-    registerKill() {
-      kills += 1;
-      const step = currentStep();
-      if (step && step.kind === 'kill' && kills >= (step.count || 1)) advance();
-    },
-    /** Advance the active mission one step; returns 'complete' | 'failed' | null. */
-    update(dt, ctx) {
-      if (!active) return null;
-      timer += dt;
-      if (active.timeLimit && timer > active.timeLimit) {
-        failed = `${active.title} — time ran out`;
-        hooks.onMissionFailed(active, 'Time ran out');
-        hooks.onDialogue('Marla: "Too slow, Rae. The clients walked. Come back when you can drive."');
-        active = null;
-        stepIndex = 0;
-        return 'failed';
-      }
-      const step = currentStep();
-      if (!step) return null;
-      if (step.kind === 'reach' && step.target) {
-        const d = Math.hypot(ctx.playerPos.x - step.target.x, ctx.playerPos.z - step.target.z);
-        if (d < step.radius) {
-          if (step.kind === 'reach') hooks.onPickup();
-          advance();
-          return active ? null : 'complete';
-        }
-      } else if (step.kind === 'drive' && ctx.driving) {
-        advance();
-      } else if (step.kind === 'van' && ctx.drivingVan) {
-        advance();
-      } else if (step.kind === 'kill') {
-        // Completion is driven by registerKill().
-      }
-      return null;
-    },
-    /** Abandon the active mission (player pressed M again, or died). */
-    abandon(reason) {
-      if (!active) return;
-      const step = currentStep();
-      if (step && step.onLeave) step.onLeave();
-      hooks.onMissionFailed(active, reason);
-      active = null;
-      stepIndex = 0;
-    },
-  };
+  complete() {
+    const def = this.active;
+    const g = this.game;
+    g.player.addCash(def.reward);
+    g.audio.cashSound();
+    g.hud.say(`MISSION COMPLETE — ${def.name}. +$${def.reward}`);
+    g.hud.flashBanner(`MISSION COMPLETE: ${def.name}  +$${def.reward}`);
+    this.clearMarker();
+    g.combat.clearEnemies();
+    g.police.clearHeat();
+    this.active = null;
+    this.index += 1;
+    if (this.index >= MISSIONS.length) {
+      g.hud.say('MARLA VOSS: "Debt paid, Rae. Veldora Bay is yours now. Free roam — the city is open."');
+      g.hud.setObjective('Free roam — explore Veldora Bay');
+      g.saveGame();
+    } else {
+      g.hud.setObjective(`Next: ${MISSIONS[this.index].name} — press N to start`);
+    }
+    g.saveGame();
+  }
+
+  fail(reason) {
+    const g = this.game;
+    g.hud.say(`MISSION FAILED — ${reason}`);
+    g.hud.flashBanner(`MISSION FAILED: ${reason}`);
+    this.clearMarker();
+    g.combat.clearEnemies();
+    g.police.clearHeat();
+    this.active = null;
+    g.hud.setObjective(`Retry: ${MISSIONS[this.index].name} — press N to start`);
+  }
 }

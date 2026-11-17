@@ -1,157 +1,177 @@
-// Rae Calloway — the player character — and the third-person camera rig.
-// On foot Rae walks and runs relative to the camera, jumps, and her limbs
-// swing with her stride. The camera orbits on mouse drag on foot and trails
-// behind the car while driving, always looking at Rae or the car.
-
+// Rae Calloway on foot: third-person movement, jumping, entering cars,
+// health with slow regeneration, and the WASTED / BUSTED states.
 import * as THREE from 'three';
-import { PLAYER } from './config.js';
-import { resolveCircleVsBuildings, clampToWorld } from './vehicles.js';
+import { PLAYER, PALETTE } from './config.js';
 
-function buildRaeMesh() {
-  const rae = new THREE.Group();
-  const skin = new THREE.MeshLambertMaterial({ color: 0xd8a077 });
-  const jacket = new THREE.MeshLambertMaterial({ color: 0x1f6a6a });
-  const jeans = new THREE.MeshLambertMaterial({ color: 0x2a3a55 });
-  const hair = new THREE.MeshLambertMaterial({ color: 0x1a1210 });
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), skin);
-  head.position.y = 1.66;
-  rae.add(head);
-  const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hair);
-  hairCap.position.y = 1.7;
-  rae.add(hairCap);
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.72, 0.34), jacket);
-  torso.position.y = 1.08;
-  torso.castShadow = true;
-  rae.add(torso);
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.62, 0.18), jacket);
-  armL.position.set(-0.4, 1.08, 0);
-  rae.add(armL);
-  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.62, 0.18), jacket);
-  armR.position.set(0.4, 1.08, 0);
-  rae.add(armR);
-  // The pistol in her right hand.
-  const gun = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.34), new THREE.MeshLambertMaterial({ color: 0x111214 }));
-  gun.position.set(0.4, 0.78, 0.12);
-  rae.add(gun);
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.72, 0.24), jeans);
-  legL.position.set(-0.15, 0.36, 0);
-  rae.add(legL);
-  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.72, 0.24), jeans);
-  legR.position.set(0.15, 0.36, 0);
-  rae.add(legR);
-  return { group: rae, armL, armR, legL, legR };
+export function makePlayerMesh() {
+  const player = new THREE.Group();
+  player.name = 'rae-calloway';
+  const jacket = new THREE.MeshStandardMaterial({ color: PALETTE.playerJacket, roughness: 0.85 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.95, 0.36), jacket);
+  body.position.y = 1.0;
+  body.castShadow = true;
+  player.add(body);
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.26, 12, 12),
+    new THREE.MeshStandardMaterial({ color: PALETTE.playerSkin, roughness: 0.8 }),
+  );
+  head.position.y = 1.68;
+  head.castShadow = true;
+  player.add(head);
+  const hair = new THREE.Mesh(
+    new THREE.SphereGeometry(0.27, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2.2),
+    new THREE.MeshStandardMaterial({ color: 0x2a1a12, roughness: 1 }),
+  );
+  hair.position.y = 1.72;
+  player.add(hair);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x2a2a33, roughness: 1 });
+  const legs = [];
+  for (const x of [-0.16, 0.16]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.55, 0.24), legMat);
+    leg.position.set(x, 0.28, 0);
+    player.add(leg);
+    legs.push(leg);
+  }
+  player.userData.legs = legs;
+  // The pistol, visible in the right hand.
+  const gun = new THREE.Mesh(
+    new THREE.BoxGeometry(0.09, 0.14, 0.42),
+    new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.4, metalness: 0.6 }),
+  );
+  gun.position.set(0.38, 1.05, 0.25);
+  player.add(gun);
+  player.userData.gun = gun;
+  return player;
 }
 
-/** Create Rae at (x, z), facing `heading`. */
-export function createPlayer(scene, x, z, heading) {
-  const built = buildRaeMesh();
-  built.group.position.set(x, 0, z);
-  built.group.rotation.y = heading;
-  scene.add(built.group);
-  return {
-    mesh: built.group,
-    armL: built.armL,
-    armR: built.armR,
-    legL: built.legL,
-    legR: built.legR,
-    x,
-    z,
-    y: 0,
-    vy: 0,
-    heading,
-    walkPhase: 0,
-    moving: false,
-    onGround: true,
-    /** Step on foot: input forward/strafe are -1..1, camYaw is the camera's yaw. */
-    step(dt, input, camYaw, colliders) {
-      const speed = input.run ? PLAYER.RUN_SPEED : PLAYER.WALK_SPEED;
-      const fx = Math.sin(camYaw);
-      const fz = Math.cos(camYaw);
-      const rx = Math.cos(camYaw);
-      const rz = -Math.sin(camYaw);
-      const mx = fx * input.forward + rx * input.strafe;
-      const mz = fz * input.forward + rz * input.strafe;
-      const len = Math.hypot(mx, mz);
-      this.moving = len > 0.01;
-      if (this.moving) {
-        const nx = mx / len;
-        const nz = mz / len;
-        this.x += nx * speed * dt;
-        this.z += nz * speed * dt;
-        const targetHeading = Math.atan2(nx, nz);
-        let diff = targetHeading - this.heading;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        this.heading += diff * Math.min(1, PLAYER.TURN_SPEED * dt);
-        this.walkPhase += dt * speed * 1.6;
-      }
-      // Jump and gravity.
-      if (input.jump && this.onGround) {
-        this.vy = 5.2;
-        this.onGround = false;
-      }
-      this.vy -= 16 * dt;
-      this.y += this.vy * dt;
-      if (this.y <= 0) {
-        this.y = 0;
-        this.vy = 0;
-        this.onGround = true;
-      }
-      resolveCircleVsBuildings(this, PLAYER.RADIUS, colliders);
-      clampToWorld(this, 4);
-      this.mesh.position.set(this.x, this.y, this.z);
-      this.mesh.rotation.y = this.heading;
-      const swing = this.moving ? Math.sin(this.walkPhase) * 0.6 : 0;
-      this.legL.rotation.x = swing;
-      this.legR.rotation.x = -swing;
-      this.armL.rotation.x = -swing * 0.8;
-      this.armR.rotation.x = swing * 0.8;
-      // Aiming pose while the mouse is held: right arm forward.
-      if (input.aiming) {
-        this.armR.rotation.x = -1.35;
-      }
-    },
-  };
-}
+export class Player {
+  constructor(scene, game) {
+    this.scene = scene;
+    this.game = game;
+    this.mesh = makePlayerMesh();
+    this.mesh.position.set(0, 0, 0);
+    scene.add(this.mesh);
+    this.health = PLAYER.maxHealth;
+    this.cash = 250;
+    this.velY = 0;
+    this.grounded = true;
+    this.yaw = 0;
+    this.pitch = -0.22;
+    this.speedNow = 0;
+    this.lastDamageAt = -99;
+    this.dead = false;
+    this.bustedFlag = false;
+    this.walkPhase = 0;
+  }
 
-/** Third-person camera: orbit on foot, trail behind the car while driving. */
-export function createCameraRig(camera) {
-  let yaw = Math.PI;
-  let pitch = 0.32;
-  let distance = 8;
-  return {
-    get yaw() {
-      return yaw;
-    },
-    setYaw(value) {
-      yaw = value;
-    },
-    applyOrbit(dx, dy) {
-      yaw -= dx * 0.005;
-      pitch = Math.max(0.05, Math.min(1.1, pitch + dy * 0.004));
-    },
-    /**
-     * Position the camera. `focus` is {x, y, z} to look at; `mode` is 'foot',
-     * 'car' (yaw eases behind the car's heading) or 'fixed' (yaw/pitch given).
-     */
-    update(dt, focus, mode, carHeading) {
-      if (mode === 'car') {
-        // Trail behind the car: the camera sits opposite the car's heading,
-        // so yaw eases toward the car's heading itself.
-        let diff = carHeading - yaw;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        yaw += diff * Math.min(1, dt * 2.2);
-        pitch += (0.22 - pitch) * Math.min(1, dt * 2);
-        distance += (10.5 - distance) * Math.min(1, dt * 2);
-      } else {
-        distance += (8 - distance) * Math.min(1, dt * 4);
+  get pos() {
+    return this.mesh.position;
+  }
+
+  teleport(x, z) {
+    this.mesh.position.set(x, 0, z);
+    this.velY = 0;
+  }
+
+  addCash(amount) {
+    this.cash += amount;
+  }
+
+  damage(amount, cause) {
+    const now = this.game.time;
+    if (this.dead) return;
+    this.health -= amount;
+    this.lastDamageAt = now;
+    this.game.audio.noiseBurst(0.12, 0.3, 600);
+    if (this.health <= 0) {
+      this.health = 0;
+      this.dead = true;
+      this.game.onWasted(cause || 'taken down in Veldora Bay');
+    }
+  }
+
+  busted() {
+    if (this.dead || this.bustedFlag) return;
+    this.bustedFlag = true;
+    this.game.onBusted();
+  }
+
+  heal(dt) {
+    if (this.dead) return;
+    if (this.game.time - this.lastDamageAt > PLAYER.regenDelay && this.health < PLAYER.maxHealth) {
+      this.health = Math.min(PLAYER.maxHealth, this.health + PLAYER.regenPerSecond * dt);
+    }
+  }
+
+  update(dt, input, colliders, inCar) {
+    if (this.dead || inCar) {
+      this.speedNow = 0;
+      return;
+    }
+    const look = input.consumeLook();
+    this.yaw -= look.dx * 0.0032;
+    this.pitch = Math.max(-0.9, Math.min(0.5, this.pitch - look.dy * 0.0028));
+    const fwd = input.moveForward();
+    const strafe = input.moveStrafe();
+    const running = input.down('ShiftLeft') || input.down('ShiftRight');
+    const speed = running ? PLAYER.runSpeed : PLAYER.walkSpeed;
+    const sin = Math.sin(this.yaw);
+    const cos = Math.cos(this.yaw);
+    let mx = 0;
+    let mz = 0;
+    if (fwd !== 0 || strafe !== 0) {
+      mx = (-sin * fwd + cos * strafe);
+      mz = (-cos * fwd - sin * strafe);
+      const len = Math.hypot(mx, mz) || 1;
+      mx /= len;
+      mz /= len;
+    }
+    const nx = this.pos.x + mx * speed * dt;
+    const nz = this.pos.z + mz * speed * dt;
+    const blocked = colliders.some((c) => nx > c.minX - 0.6 && nx < c.maxX + 0.6 && nz > c.minZ - 0.6 && nz < c.maxZ + 0.6);
+    if (!blocked && (mx !== 0 || mz !== 0)) {
+      this.pos.x = Math.max(-175, Math.min(205, nx));
+      this.pos.z = Math.max(-175, Math.min(175, nz));
+      this.speedNow = speed;
+      this.walkPhase += dt * speed * 1.6;
+      const swing = Math.sin(this.walkPhase) * 0.5;
+      this.mesh.userData.legs[0].rotation.x = swing;
+      this.mesh.userData.legs[1].rotation.x = -swing;
+    } else {
+      this.speedNow = 0;
+      this.mesh.userData.legs[0].rotation.x = 0;
+      this.mesh.userData.legs[1].rotation.x = 0;
+    }
+    if (input.wasPressed('Space') && this.grounded) {
+      this.velY = PLAYER.jumpSpeed;
+      this.grounded = false;
+    }
+    if (!this.grounded) {
+      this.velY -= PLAYER.gravity * dt;
+      this.pos.y += this.velY * dt;
+      if (this.pos.y <= 0) {
+        this.pos.y = 0;
+        this.velY = 0;
+        this.grounded = true;
       }
-      const cx = focus.x - Math.sin(yaw) * Math.cos(pitch) * distance;
-      const cz = focus.z - Math.cos(yaw) * Math.cos(pitch) * distance;
-      const cy = focus.y + Math.sin(pitch) * distance + 1.2;
-      camera.position.set(cx, Math.max(1.2, cy), cz);
-      camera.lookAt(focus.x, focus.y + 1.4, focus.z);
-    },
-  };
+    }
+    this.mesh.rotation.y = this.yaw + Math.PI;
+  }
+
+  // Third-person orbit camera, behind and above Rae.
+  orbitCamera(camera, dt) {
+    const dist = 7.5;
+    const height = 3.2 + this.pitch * 4;
+    const cx = this.pos.x + Math.sin(this.yaw) * dist;
+    const cz = this.pos.z + Math.cos(this.yaw) * dist;
+    const target = new THREE.Vector3(cx, height, cz);
+    camera.position.lerp(target, Math.min(1, dt * 7));
+    camera.lookAt(this.pos.x, 1.5, this.pos.z);
+  }
+
+  aimDirection(camera) {
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    return dir;
+  }
 }

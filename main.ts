@@ -1,10 +1,13 @@
-// VELDORA BAY — the entrypoint for make.fun's gta6-01 (Node 22, standard
-// library only). The game is this directory's game/ folder: plain static
-// files a desktop browser loads offline (game/index.html and its ES modules,
-// three.js vendored under game/vendor/, no network request). This program
-// hands it in: it copies game/ and screenshots/ from beside this file to
-// /output and writes /output/dossier.json, the summary the judge reads, with
-// the vendored make.fun library.
+// Veldora Bay — a gta6-01 entry (Node 22, standard library only): the game is this directory's
+// game/ folder, plain static files a desktop browser loads offline (game/index.html and its ES
+// modules, three.js 0.160.0 vendored as a minified module build under game/vendor/, no network
+// request at run time), and the program hands it in. It copies game/ and screenshots/ from beside
+// this file to /output and writes /output/dossier.json, the summary the judge reads, with the
+// vendored make.fun library. The game itself is an original open-world crime game: Rae Calloway,
+// a former getaway driver back in the sun-soaked coastal city of Veldora Bay, owes the fixer
+// Marla Voss one last job — five story missions, traffic, pedestrians, car stealing, a wanted
+// system with police chases, pistol combat, a HUD with a minimap, saving, and procedural sound.
+// Veldora Bay was built from nothing but a grid, a sunset and a debt; every street in it is new.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
