@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VELDORA BAY — an open-world crime game</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1420; font-family: 'Segoe UI', system-ui, sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .hidden { display: none !important; }
+  /* ---- HUD ---- */
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.8); z-index: 5; }
+  #top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
+  #stars { font-size: 26px; letter-spacing: 2px; line-height: 1; }
+  #stars .star { color: rgba(255,255,255,.25); }
+  #stars .star.on { color: #ffd21a; }
+  #stars.hot { animation: pulse .8s infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+  #clock { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  #cash { font-size: 24px; font-weight: 800; color: #7dff8a; margin-top: 2px; }
+  #minimap-wrap { position: absolute; left: 16px; bottom: 16px; border: 2px solid rgba(255,255,255,.55); border-radius: 4px; background: rgba(10,10,18,.72); }
+  #minimap { display: block; }
+  #bottom-left { position: absolute; left: 16px; bottom: 236px; width: 280px; }
+  #health-row { display: flex; align-items: center; gap: 8px; }
+  #health-bar { flex: 1; height: 14px; background: rgba(0,0,0,.6); border: 1px solid rgba(255,255,255,.5); border-radius: 3px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #37c24a, #7dff8a); }
+  #health-fill.low { background: linear-gradient(90deg, #c22a2a, #ff6a5a); }
+  #health-text { font-weight: 700; }
+  #speed { font-size: 26px; font-weight: 800; margin-top: 6px; }
+  #objective-box { position: absolute; top: 14px; left: 16px; max-width: 430px; }
+  #objective-title { font-size: 12px; letter-spacing: 2px; color: #ffd21a; font-weight: 700; }
+  #objective { font-size: 19px; font-weight: 700; margin-top: 2px; }
+  #timer { font-size: 17px; font-weight: 700; color: #ffb36b; margin-top: 2px; }
+  #mission-list { margin-top: 8px; font-size: 13px; }
+  #mission-list .mission { padding: 2px 0; opacity: .75; }
+  #mission-list .mission.active { opacity: 1; color: #ffd21a; font-weight: 700; }
+  #mission-list .mission.done { opacity: .55; text-decoration: line-through; }
+  #mission-list .m-reward { float: right; color: #7dff8a; }
+  #toast { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); background: rgba(10,10,18,.85); border: 1px solid rgba(255,210,26,.6); padding: 10px 18px; border-radius: 6px; font-size: 16px; font-weight: 600; opacity: 0; transition: opacity .3s; max-width: 70vw; text-align: center; }
+  #toast.show { opacity: 1; }
+  #dialogue { position: absolute; left: 50%; bottom: 190px; transform: translateX(-50%); width: min(620px, 80vw); background: rgba(12,10,24,.88); border-left: 4px solid #ffd21a; padding: 12px 16px; border-radius: 4px; font-size: 15px; line-height: 1.45; opacity: 0; transition: opacity .3s; }
+  #dialogue.show { opacity: 1; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,.9); }
+  #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+  #crosshair::after { top: 8px; left: 0; width: 18px; height: 2px; }
+  #mute-btn { position: absolute; right: 16px; bottom: 16px; pointer-events: auto; background: rgba(10,10,18,.8); color: #fff; border: 1px solid rgba(255,255,255,.5); border-radius: 6px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
+  #controls-hint { position: absolute; right: 16px; bottom: 64px; font-size: 12px; opacity: .8; text-align: right; line-height: 1.6; }
+  /* ---- Menus ---- */
+  .menu-screen { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(20,10,30,.25) 0%, rgba(20,10,30,.72) 100%); color: #fff; }
+  .menu-card { text-align: center; max-width: 640px; padding: 32px; }
+  .menu-card h1 { font-size: 64px; margin: 0; letter-spacing: 6px; color: #ffd21a; text-shadow: 0 4px 24px rgba(0,0,0,.9); }
+  .menu-card h2 { font-size: 20px; font-weight: 400; margin: 6px 0 22px; color: #ffe9a8; }
+  .menu-card p { font-size: 15px; line-height: 1.6; color: #f0e8d8; }
+  .menu-card .controls { font-size: 14px; line-height: 1.9; background: rgba(0,0,0,.45); border-radius: 8px; padding: 14px 20px; margin: 18px auto; text-align: left; display: inline-block; }
+  .menu-card .controls b { color: #ffd21a; }
+  .menu-btn { pointer-events: auto; display: inline-block; margin: 6px; padding: 13px 34px; font-size: 17px; font-weight: 700; letter-spacing: 1px; color: #1a1420; background: #ffd21a; border: none; border-radius: 6px; cursor: pointer; }
+  .menu-btn:hover { background: #ffe45a; }
+  .menu-btn.secondary { background: rgba(255,255,255,.16); color: #fff; border: 1px solid rgba(255,255,255,.6); }
+  #end-title { font-size: 72px; letter-spacing: 8px; margin: 0; }
+  #end-title.wasted { color: #ff5a4a; }
+  #end-title.busted { color: #5a8aff; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game" aria-label="Veldora Bay: an open-world crime game. Drive, steal cars, outrun the police and run missions."></canvas>
+
+<div id="hud" class="hidden">
+  <div id="objective-box">
+    <div id="objective-title">VELDORA BAY</div>
+    <div id="objective">Free roam — press M to start the next mission</div>
+    <div id="timer"></div>
+    <div id="mission-list"></div>
+  </div>
+  <div id="top-right">
+    <div id="stars"></div>
+    <div id="clock">18:20</div>
+    <div id="cash">$250</div>
+  </div>
+  <div id="bottom-left">
+    <div id="health-row"><span>♥</span><div id="health-bar"><div id="health-fill"></div></div><span id="health-text">100</span></div>
+    <div id="speed"></div>
+  </div>
+  <div id="minimap-wrap"><canvas id="minimap" width="208" height="208"></canvas></div>
+  <div id="crosshair"></div>
+  <div id="toast"></div>
+  <div id="dialogue"><span id="dialogue-text"></span></div>
+  <div id="controls-hint">WASD move / drive · E enter car · Mouse aim + click shoot<br>Shift run · Space jump · M mission · P pause · K mute</div>
+  <button id="mute-btn">🔊 Sound</button>
+</div>
+
+<div id="menu" class="menu-screen">
+  <div class="menu-card">
+    <h1>VELDORA BAY</h1>
+    <h2>An open-world crime game — Rae Calloway is back, and the city owes her.</h2>
+    <p>Steal cars, outrun the VBPD, run five story missions for the fixer Marla Voss, and take the casino cash in the final heist. A sun-soaked city, traffic, pedestrians, police, and a wanted level that follows every bad decision.</p>
+    <div class="controls">
+      <b>W A S D</b> — move / drive &nbsp;·&nbsp; <b>Mouse drag</b> — camera<br>
+      <b>E</b> — steal / exit car &nbsp;·&nbsp; <b>Click</b> — shoot pistol<br>
+      <b>Shift</b> — run &nbsp;·&nbsp; <b>Space</b> — jump &nbsp;·&nbsp; <b>M</b> — next mission<br>
+      <b>P / Esc</b> — pause &nbsp;·&nbsp; <b>K</b> — mute
+    </div>
+    <div>
+      <button id="btn-start" class="menu-btn">START</button>
+      <button id="btn-continue" class="menu-btn secondary">CONTINUE</button>
+    </div>
+    <p style="font-size:12px; opacity:.75">Progress saves in this browser. No downloads, no accounts — the whole city runs from these files.</p>
+  </div>
+</div>
+
+<div id="pause-menu" class="menu-screen hidden">
+  <div class="menu-card">
+    <h1 style="font-size:44px">PAUSED</h1>
+    <p>Veldora Bay waits for no one. Except right now.</p>
+    <div>
+      <button id="btn-resume" class="menu-btn">RESUME</button>
+      <button id="btn-save" class="menu-btn secondary">SAVE</button>
+      <button id="btn-mission" class="menu-btn secondary">START MISSION</button>
+      <button id="btn-restart" class="menu-btn secondary">RESTART</button>
+    </div>
+  </div>
+</div>
+
+<div id="end-screen" class="menu-screen hidden">
+  <div class="menu-card">
+    <h1 id="end-title">WASTED</h1>
+    <p id="end-text"></p>
+    <div><button id="btn-respawn" class="menu-btn">GET BACK UP</button></div>
+  </div>
+</div>
+
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
