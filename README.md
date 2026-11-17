@@ -1,8 +1,8 @@
 # Veldora Bay — an open-world crime game
 
-[![Competition](https://make.fun/api/competitions/gta6-01/badge)](https://make.fun/c/gta6-01)
-[![Rank](https://make.fun/api/competitions/gta6-01/rank?handle=bingx12&badge=1)](https://make.fun/c/gta6-01)
-[![Reward](https://make.fun/api/competitions/gta6-01/reward?badge=1)](https://make.fun/c/gta6-01)
+[![make.fun · gta6-01](https://make.fun/badge/gta6-01.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![rank](https://make.fun/badge/gta6-01/bingx12/gta6-01/rank.svg)](https://make.fun/bounty/gta6-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
+[![reward](https://make.fun/badge/gta6-01/bingx12/gta6-01/reward.svg)](https://make.fun/bounty/gta6-01?utm_source=github&utm_medium=readme&utm_campaign=gta6-01)
 
 Rae Calloway, a former getaway driver, is back in Veldora Bay — a sun-soaked coastal city of towers, palms, beach and docks — and owes the fixer Marla Voss one last job. Five story missions take Rae from a tutorial drive through a police chase, a timed parcel run and a dockside shootout to a final armoured van heist.
 
